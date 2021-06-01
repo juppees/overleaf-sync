@@ -43,7 +43,7 @@ except ImportError:
 @click.option('-v', '--verbose', 'verbose', is_flag=True, help="Enable extended error logging.")
 @click.version_option()
 @click.pass_context
-def main(ctx, local, remote, project_name, cookie_path, sync_path, olignore_path, verbose):
+def main(ctx, local, remote, project_name, cookie_path, sync_path, olignore_path, olonprem_path, verbose):
     if ctx.invoked_subcommand is None:
         if not os.path.isfile(cookie_path):
             raise click.ClickException(
@@ -52,7 +52,8 @@ def main(ctx, local, remote, project_name, cookie_path, sync_path, olignore_path
         with open(cookie_path, 'rb') as f:
             store = pickle.load(f)
 
-        overleaf_client = OverleafClient(store["cookie"], store["csrf"])
+        onprem_url = olonpremChecker(sync_path=sync_path)
+        overleaf_client = OverleafClient(store["cookie"], store["csrf"], onprem_url)
 
         # Change the current directory to the specified sync path
         os.chdir(sync_path)
@@ -127,7 +128,7 @@ def login(username, password, cookie_path, verbose):
 
 
 def login_handler(username, password, path):
-    overleaf_client = OverleafClient()
+    overleaf_client = OverleafClient(None,None,olonpremChecker())
     store = overleaf_client.login(username, password)
     if store is None:
         return False
@@ -253,6 +254,25 @@ def olignore_keep_list(olignore_path):
     keep_list = [item for item in keep_list if not os.path.isdir(item)]
     return keep_list
 
+
+def olonpremChecker(sync_path = ""):
+
+    # Read .olonprem file for URL to local installation of Overleaf/Sharelatex
+    olonprem_file = os.path.join(sync_path, ".olonprem")
+
+    click.echo("=" * 40)
+    onprem_url = None
+    if not os.path.isfile(olonprem_file):
+        click.echo("\nNotionprem: .olonprem file does not exist, will sync with overleaf.com.")
+    else:
+
+        with open(olonprem_file, 'r') as f:
+            onprem_url = f.readline()
+            f.close()
+
+        click.echo("\n.olonprem: using %s as onprem server" % onprem_url)
+
+    return onprem_url
 
 if __name__ == "__main__":
     main()
